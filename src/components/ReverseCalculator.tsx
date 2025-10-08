@@ -7,24 +7,69 @@ interface ReverseCalculatorProps {
   rates: ExchangeRate[];
 }
 
+type Currency = 'USD' | string;
+
 export function ReverseCalculator({ rates }: ReverseCalculatorProps) {
-  const [selectedCurrency, setSelectedCurrency] = useState(rates[0]?.currency_code || 'LAK');
-  const [localAmount, setLocalAmount] = useState<string>('1000');
+  const [fromCurrency, setFromCurrency] = useState<Currency>('USD');
+  const [toCurrency, setToCurrency] = useState<Currency>(rates[0]?.currency_code || 'LAK');
+  const [amount, setAmount] = useState<string>('100');
   const [rateType, setRateType] = useState<'buy' | 'sell'>('buy');
 
-  const selectedRate = rates.find((r) => r.currency_code === selectedCurrency);
+  const allCurrencies: Currency[] = ['USD', ...rates.map((r) => r.currency_code)];
 
-  let usdEquivalent = 0;
-  if (selectedRate) {
-    const { buyRate, sellRate } = calculateRates(
-      selectedRate.main_rate,
-      selectedRate.buy_percentage,
-      selectedRate.sell_percentage
-    );
-    const rate = rateType === 'buy' ? buyRate : sellRate;
-    const amount = parseFloat(localAmount || '0');
-    usdEquivalent = rate > 0 ? amount / rate : 0;
-  }
+  const calculateConversion = () => {
+    const inputAmount = parseFloat(amount || '0');
+
+    if (fromCurrency === 'USD' && toCurrency !== 'USD') {
+      const toRate = rates.find((r) => r.currency_code === toCurrency);
+      if (toRate) {
+        const { buyRate, sellRate } = calculateRates(
+          toRate.main_rate,
+          toRate.buy_percentage,
+          toRate.sell_percentage
+        );
+        const rate = rateType === 'buy' ? buyRate : sellRate;
+        return inputAmount * rate;
+      }
+    } else if (fromCurrency !== 'USD' && toCurrency === 'USD') {
+      const fromRate = rates.find((r) => r.currency_code === fromCurrency);
+      if (fromRate) {
+        const { buyRate, sellRate } = calculateRates(
+          fromRate.main_rate,
+          fromRate.buy_percentage,
+          fromRate.sell_percentage
+        );
+        const rate = rateType === 'buy' ? buyRate : sellRate;
+        return rate > 0 ? inputAmount / rate : 0;
+      }
+    } else if (fromCurrency !== 'USD' && toCurrency !== 'USD') {
+      const fromRate = rates.find((r) => r.currency_code === fromCurrency);
+      const toRate = rates.find((r) => r.currency_code === toCurrency);
+      if (fromRate && toRate) {
+        const fromRates = calculateRates(
+          fromRate.main_rate,
+          fromRate.buy_percentage,
+          fromRate.sell_percentage
+        );
+        const toRates = calculateRates(
+          toRate.main_rate,
+          toRate.buy_percentage,
+          toRate.sell_percentage
+        );
+        const fromRateValue = rateType === 'buy' ? fromRates.buyRate : fromRates.sellRate;
+        const toRateValue = rateType === 'buy' ? toRates.buyRate : toRates.sellRate;
+
+        const usdAmount = fromRateValue > 0 ? inputAmount / fromRateValue : 0;
+        return usdAmount * toRateValue;
+      }
+    } else if (fromCurrency === 'USD' && toCurrency === 'USD') {
+      return inputAmount;
+    }
+
+    return 0;
+  };
+
+  const convertedAmount = calculateConversion();
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-osl-navy-100">
@@ -33,31 +78,50 @@ export function ReverseCalculator({ rates }: ReverseCalculatorProps) {
         <h3 className="text-xl font-bold text-osl-navy-800">Reverse Calculator</h3>
       </div>
       <p className="text-sm text-gray-600 mb-4">
-        Calculate USD equivalent from local currency
+        Convert between all currencies
       </p>
 
       <div className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Currency
-          </label>
-          <select
-            value={selectedCurrency}
-            onChange={(e) => setSelectedCurrency(e.target.value)}
-            className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-osl-navy-500 focus:border-transparent transition-all"
-          >
-            {rates.map((rate) => (
-              <option key={rate.id} value={rate.currency_code}>
-                {rate.currency_code} - {rate.currency_name}
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">From</label>
+            <select
+              value={fromCurrency}
+              onChange={(e) => setFromCurrency(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-osl-navy-500 focus:border-transparent transition-all"
+            >
+              {allCurrencies.map((currency) => {
+                const rate = rates.find((r) => r.currency_code === currency);
+                return (
+                  <option key={currency} value={currency}>
+                    {currency === 'USD' ? 'USD - US Dollar' : `${currency} - ${rate?.currency_name}`}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">To</label>
+            <select
+              value={toCurrency}
+              onChange={(e) => setToCurrency(e.target.value)}
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-osl-navy-500 focus:border-transparent transition-all"
+            >
+              {allCurrencies.map((currency) => {
+                const rate = rates.find((r) => r.currency_code === currency);
+                return (
+                  <option key={currency} value={currency}>
+                    {currency === 'USD' ? 'USD - US Dollar' : `${currency} - ${rate?.currency_name}`}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Rate Type
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Rate Type</label>
           <div className="flex gap-2">
             <button
               onClick={() => setRateType('buy')}
@@ -83,14 +147,12 @@ export function ReverseCalculator({ rates }: ReverseCalculatorProps) {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Local Currency Amount
-          </label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Amount</label>
           <input
             type="number"
             step="0.01"
-            value={localAmount}
-            onChange={(e) => setLocalAmount(e.target.value)}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             placeholder="Enter amount"
             className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-osl-navy-500 focus:border-transparent transition-all"
           />
@@ -98,13 +160,12 @@ export function ReverseCalculator({ rates }: ReverseCalculatorProps) {
 
         <div className="bg-gradient-to-br from-osl-yellow-50 to-osl-yellow-100 rounded-lg p-6 border-2 border-osl-yellow-300">
           <div className="text-center">
-            <div className="text-sm text-gray-600 mb-2">USD Equivalent</div>
+            <div className="text-sm text-gray-600 mb-2">Converted Amount</div>
             <div className="text-3xl font-bold text-osl-navy-800">
-              ${formatCurrency(usdEquivalent, 2)}
+              {formatCurrency(convertedAmount, 2)} {toCurrency}
             </div>
             <div className="text-xs text-gray-500 mt-2">
-              {formatCurrency(parseFloat(localAmount || '0'), 2)} {selectedCurrency} ={' '}
-              {formatCurrency(usdEquivalent, 2)} USD
+              {formatCurrency(parseFloat(amount || '0'), 2)} {fromCurrency} = {formatCurrency(convertedAmount, 2)} {toCurrency}
             </div>
           </div>
         </div>
