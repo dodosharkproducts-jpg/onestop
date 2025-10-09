@@ -20,6 +20,10 @@ export function ReverseCalculator({ rates }: ReverseCalculatorProps) {
   const calculateConversion = () => {
     const inputAmount = parseFloat(amount || '0');
 
+    if (fromCurrency === toCurrency) {
+      return inputAmount;
+    }
+
     if (fromCurrency === 'USD' && toCurrency !== 'USD') {
       const toRate = rates.find((r) => r.currency_code === toCurrency);
       if (toRate) {
@@ -62,8 +66,6 @@ export function ReverseCalculator({ rates }: ReverseCalculatorProps) {
         const usdAmount = fromRateValue > 0 ? inputAmount / fromRateValue : 0;
         return usdAmount * toRateValue;
       }
-    } else if (fromCurrency === 'USD' && toCurrency === 'USD') {
-      return inputAmount;
     }
 
     return 0;
